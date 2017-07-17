@@ -85,7 +85,7 @@ class TaskDB(SplitTableMixin, BaseTaskDB):
                 data[each] = utils.utf8(json.dumps(data[each]))
         return data
 
-    def load_tasks(self, status, project=None, fields=None):
+    def load_tasks(self, status, project=None, fields=None, order=None, offset=0, limit=None):
         if project and project not in self.projects:
             return
 

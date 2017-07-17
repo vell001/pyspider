@@ -53,7 +53,7 @@ class TaskDB(SplitTableMixin, BaseTaskDB):
                 data[each] = json.dumps(data[each])
         return data
 
-    def load_tasks(self, status, project=None, fields=None):
+    def load_tasks(self, status, project=None, fields=None, order=None, offset=0, limit=None):
         if not project:
             self._list_project()
 
@@ -64,7 +64,7 @@ class TaskDB(SplitTableMixin, BaseTaskDB):
 
         for project in projects:
             collection_name = self._collection_name(project)
-            for task in self.database[collection_name].find({'status': status}, fields):
+            for task in self.database[collection_name].find({'status': status}, fields).limit(limit).skip(offset):
                 yield self._parse(task)
 
     def get_task(self, project, taskid, fields=None):

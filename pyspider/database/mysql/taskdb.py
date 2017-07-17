@@ -68,7 +68,7 @@ class TaskDB(MySQLMixin, SplitTableMixin, BaseTaskDB, BaseDB):
                 data[each] = json.dumps(data[each])
         return data
 
-    def load_tasks(self, status, project=None, fields=None):
+    def load_tasks(self, status, project=None, fields=None, order=None, offset=0, limit=None):
         if project and project not in self.projects:
             return
         where = "`status` = %s" % self.placeholder
@@ -81,7 +81,7 @@ class TaskDB(MySQLMixin, SplitTableMixin, BaseTaskDB, BaseDB):
         for project in projects:
             tablename = self._tablename(project)
             for each in self._select2dic(
-                tablename, what=fields, where=where, where_values=(status, )
+                    tablename, what=fields, where=where, where_values=(status,), order=order, offset=offset, limit=limit
             ):
                 yield self._parse(each)
 
@@ -92,7 +92,7 @@ class TaskDB(MySQLMixin, SplitTableMixin, BaseTaskDB, BaseDB):
             return None
         where = "`taskid` = %s" % self.placeholder
         tablename = self._tablename(project)
-        for each in self._select2dic(tablename, what=fields, where=where, where_values=(taskid, )):
+        for each in self._select2dic(tablename, what=fields, where=where, where_values=(taskid,)):
             return self._parse(each)
         return None
 
@@ -104,7 +104,7 @@ class TaskDB(MySQLMixin, SplitTableMixin, BaseTaskDB, BaseDB):
             return result
         tablename = self._tablename(project)
         for status, count in self._execute("SELECT `status`, count(1) FROM %s GROUP BY `status`" %
-                                           self.escape(tablename)):
+                                                   self.escape(tablename)):
             result[status] = count
         return result
 
@@ -133,6 +133,6 @@ class TaskDB(MySQLMixin, SplitTableMixin, BaseTaskDB, BaseDB):
         return self._update(
             tablename,
             where="`taskid` = %s" % self.placeholder,
-            where_values=(taskid, ),
+            where_values=(taskid,),
             **self._stringify(obj)
         )

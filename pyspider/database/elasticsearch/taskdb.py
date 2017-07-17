@@ -57,7 +57,7 @@ class TaskDB(BaseTaskDB):
                              }}}, _source=False)
         return [each['key'] for each in ret['aggregations']['projects'].get('buckets', [])]
 
-    def load_tasks(self, status, project=None, fields=None):
+    def load_tasks(self, status, project=None, fields=None, order=None, offset=0, limit=None):
         self.refresh()
         if project is None:
             for project in self.projects:

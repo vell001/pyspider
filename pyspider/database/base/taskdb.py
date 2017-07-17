@@ -64,7 +64,7 @@ class TaskDB(object):
 
     projects = set()  # projects in taskdb
 
-    def load_tasks(self, status, project=None, fields=None):
+    def load_tasks(self, status, project=None, fields=None, order=None, offset=0, limit=None):
         raise NotImplementedError
 
     def get_task(self, project, taskid, fields=None):

@@ -72,7 +72,7 @@ class TaskDB(BaseTaskDB):
                 self.__prefix__ + 'projects'))
         return self._projects
 
-    def load_tasks(self, status, project=None, fields=None):
+    def load_tasks(self, status, project=None, fields=None, order=None, offset=0, limit=None):
         if project is None:
             project = self.projects
         elif not isinstance(project, list):

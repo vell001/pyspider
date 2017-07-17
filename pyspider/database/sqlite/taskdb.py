@@ -54,7 +54,7 @@ class TaskDB(SQLiteMixin, SplitTableMixin, BaseTaskDB, BaseDB):
                 data[each] = json.dumps(data[each])
         return data
 
-    def load_tasks(self, status, project=None, fields=None):
+    def load_tasks(self, status, project=None, fields=None, order=None, offset=0, limit=None):
         if project and project not in self.projects:
             return
         where = "status = %d" % status
@@ -66,7 +66,7 @@ class TaskDB(SQLiteMixin, SplitTableMixin, BaseTaskDB, BaseDB):
 
         for project in projects:
             tablename = self._tablename(project)
-            for each in self._select2dic(tablename, what=fields, where=where):
+            for each in self._select2dic(tablename, what=fields, where=where, order=order, offset=offset, limit=limit):
                 yield self._parse(each)
 
     def get_task(self, project, taskid, fields=None):
@@ -78,7 +78,7 @@ class TaskDB(SQLiteMixin, SplitTableMixin, BaseTaskDB, BaseDB):
         if project not in self.projects:
             return None
         tablename = self._tablename(project)
-        for each in self._select2dic(tablename, what=fields, where=where, where_values=(taskid, )):
+        for each in self._select2dic(tablename, what=fields, where=where, where_values=(taskid,)):
             return self._parse(each)
         return None
 
@@ -93,7 +93,7 @@ class TaskDB(SQLiteMixin, SplitTableMixin, BaseTaskDB, BaseDB):
             return result
         tablename = self._tablename(project)
         for status, count in self._execute("SELECT `status`, count(1) FROM %s GROUP BY `status`" %
-                                           self.escape(tablename)):
+                                                   self.escape(tablename)):
             result[status] = count
         return result
 
@@ -116,6 +116,6 @@ class TaskDB(SQLiteMixin, SplitTableMixin, BaseTaskDB, BaseDB):
         obj.update(kwargs)
         obj['updatetime'] = time.time()
         return self._update(
-            tablename, where="`taskid` = %s" % self.placeholder, where_values=(taskid, ),
+            tablename, where="`taskid` = %s" % self.placeholder, where_values=(taskid,),
             **self._stringify(obj)
         )

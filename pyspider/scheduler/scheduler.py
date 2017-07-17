@@ -27,13 +27,14 @@ class Project(object):
     '''
     project for scheduler
     '''
+
     def __init__(self, scheduler, project_info):
         '''
         '''
         self.scheduler = scheduler
 
         self.active_tasks = deque(maxlen=scheduler.ACTIVE_TASKS)
-        self.task_queue = TaskQueue()
+        self.task_queue = TaskQueue(cache_max_size=scheduler.TASK_QUEUE_CACHE_SIZE)
         self.task_loaded = False
         self._selected_tasks = False  # selected tasks after recent pause
         self._send_finished_event_wait = 0  # wait for scheduler.FAIL_PAUSE_NUM loop steps before sending the event
@@ -148,18 +149,19 @@ class Scheduler(object):
     LOOP_LIMIT = 1000
     LOOP_INTERVAL = 0.1
     ACTIVE_TASKS = 100
+    TASK_QUEUE_CACHE_SIZE = 10000
     INQUEUE_LIMIT = 0
     EXCEPTION_LIMIT = 3
     DELETE_TIME = 24 * 60 * 60
     DEFAULT_RETRY_DELAY = {
         0: 30,
-        1: 1*60*60,
-        2: 6*60*60,
-        3: 12*60*60,
-        '': 24*60*60
+        1: 1 * 60 * 60,
+        2: 6 * 60 * 60,
+        3: 12 * 60 * 60,
+        '': 24 * 60 * 60
     }
     FAIL_PAUSE_NUM = 10
-    PAUSE_TIME = 5*60
+    PAUSE_TIME = 5 * 60
     UNPAUSE_CHECK_NUM = 3
 
     TASK_PACK = 1
@@ -206,7 +208,7 @@ class Scheduler(object):
         '''Check project update'''
         now = time.time()
         if (
-                not self._force_update_project
+                    not self._force_update_project
                 and self._last_update_project + self.UPDATE_PROJECT_INTERVAL > now
         ):
             return
@@ -217,6 +219,8 @@ class Scheduler(object):
         self._last_update_project = now
 
     get_info_attributes = ['min_tick', 'retry_delay', 'crawl_config']
+
+    scheduler_task_fields = ['taskid', 'project', 'schedule', ]
 
     def _update_project(self, project):
         '''update one project'''
@@ -251,32 +255,27 @@ class Scheduler(object):
                 project.task_loaded = True
         else:
             if project.task_loaded:
-                project.task_queue = TaskQueue()
+                project.task_queue = TaskQueue(cache_max_size=self.TASK_QUEUE_CACHE_SIZE)
                 project.task_loaded = False
 
             if project not in self._cnt['all']:
                 self._update_project_cnt(project.name)
 
-    scheduler_task_fields = ['taskid', 'project', 'schedule', ]
-
     def _load_tasks(self, project):
         '''load tasks from database'''
         task_queue = project.task_queue
+        task_queue.taskdb = self.taskdb
+        task_queue.project_name = project.name
+        task_queue.scheduler_task_fields = self.scheduler_task_fields
+        task_queue.default_schedule = self.default_schedule
+        task_queue.load_tasks()
 
-        for task in self.taskdb.load_tasks(
-                self.taskdb.ACTIVE, project.name, self.scheduler_task_fields
-        ):
-            taskid = task['taskid']
-            _schedule = task.get('schedule', self.default_schedule)
-            priority = _schedule.get('priority', self.default_schedule['priority'])
-            exetime = _schedule.get('exetime', self.default_schedule['exetime'])
-            task_queue.put(taskid, priority, exetime)
         project.task_loaded = True
-        logger.debug('project: %s loaded %d tasks.', project.name, len(task_queue))
+        logger.debug('project: %s loaded %d tasks.', project.name, len(project.task_queue))
 
-        if project not in self._cnt['all']:
-            self._update_project_cnt(project.name)
-        self._cnt['all'].value((project.name, 'pending'), len(project.task_queue))
+        # if project not in self._cnt['all']:
+        self._update_project_cnt(project.name)
+        # self._cnt['all'].value((project.name, 'pending'), len(project.task_queue))
 
     def _update_project_cnt(self, project_name):
         status_count = self.taskdb.status_count(project_name)
@@ -298,7 +297,7 @@ class Scheduler(object):
         return False if any of 'taskid', 'project', 'url' is not in task dict
                         or project in not in task_queue
         '''
-        for each in ('taskid', 'project', 'url', ):
+        for each in ('taskid', 'project', 'url',):
             if each not in task or not task[each]:
                 logger.error('%s not in task: %.200r', each, task)
                 return False
@@ -393,7 +392,7 @@ class Scheduler(object):
             if isinstance(task, list):
                 _tasks = task
             else:
-                _tasks = (task, )
+                _tasks = (task,)
 
             for task in _tasks:
                 if not self.task_verify(task):
@@ -688,6 +687,7 @@ class Scheduler(object):
                 return self._cnt[_time].to_dict(_type)
             except:
                 logger.exception('')
+
         application.register_function(dump_counter, 'counter')
 
         def new_task(task):
@@ -695,16 +695,19 @@ class Scheduler(object):
                 self.newtask_queue.put(task)
                 return True
             return False
+
         application.register_function(new_task, 'newtask')
 
         def send_task(task):
             '''dispatch task to fetcher'''
             self.send_task(task)
             return True
+
         application.register_function(send_task, 'send_task')
 
         def update_project():
             self._force_update_project = True
+
         application.register_function(update_project, 'update_project')
 
         def get_active_tasks(project=None, limit=100):
@@ -749,6 +752,7 @@ class Scheduler(object):
             # fix for "<type 'exceptions.TypeError'>:dictionary key must be string"
             # have no idea why
             return json.loads(json.dumps(result))
+
         application.register_function(get_active_tasks, 'get_active_tasks')
 
         def get_projects_pause_status():
@@ -756,6 +760,7 @@ class Scheduler(object):
             for project_name, project in iteritems(self.projects):
                 result[project_name] = project.paused
             return result
+
         application.register_function(get_projects_pause_status, 'get_projects_pause_status')
 
         def webui_update():
@@ -769,6 +774,7 @@ class Scheduler(object):
                     'all': dump_counter('all', 'sum'),
                 },
             }
+
         application.register_function(webui_update, 'webui_update')
 
         import tornado.wsgi
@@ -1208,7 +1214,7 @@ class ThreadBaseScheduler(Scheduler):
     def _start_threads(self):
         for i in range(self.threads):
             queue = Queue.Queue()
-            thread = threading.Thread(target=self._thread_worker, args=(queue, ))
+            thread = threading.Thread(target=self._thread_worker, args=(queue,))
             thread.daemon = True
             thread.start()
             self.thread_objs.append(thread)
@@ -1236,7 +1242,7 @@ class ThreadBaseScheduler(Scheduler):
                         time.sleep(0.1)
                         continue
                     else:
-                        queue = self.thread_queues[random.randint(0, len(self.thread_queues)-1)]
+                        queue = self.thread_queues[random.randint(0, len(self.thread_queues) - 1)]
                 break
         else:
             queue = self.thread_queues[i % len(self.thread_queues)]

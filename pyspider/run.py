@@ -75,12 +75,12 @@ def connect_rpc(ctx, param, value):
               help='database url for resultdb, default: sqlite')
 @click.option('--message-queue', envvar='AMQP_URL',
               help='connection url to message queue, '
-              'default: builtin multiprocessing.Queue')
+                   'default: builtin multiprocessing.Queue')
 @click.option('--amqp-url', help='[deprecated] amqp url for rabbitmq. '
-              'please use --message-queue instead.')
+                                 'please use --message-queue instead.')
 @click.option('--beanstalk', envvar='BEANSTALK_HOST',
               help='[deprecated] beanstalk config for beanstalk queue. '
-              'please use --message-queue instead.')
+                   'please use --message-queue instead.')
 @click.option('--phantomjs-proxy', envvar='PHANTOMJS_PROXY', help="phantomjs proxy ip:port")
 @click.option('--data-path', default='./data', help='data dir path')
 @click.option('--add-sys-path/--not-add-sys-path', default=True, is_flag=True,
@@ -117,7 +117,7 @@ def cli(ctx, **kwargs):
                 os.mkdir(kwargs['data_path'])
             if db in ('taskdb', 'resultdb'):
                 kwargs[db] = utils.Get(lambda db=db: connect_database('sqlite+%s://' % (db)))
-            elif db in ('projectdb', ):
+            elif db in ('projectdb',):
                 kwargs[db] = utils.Get(lambda db=db: connect_database('local+%s://%s' % (
                     db, os.path.join(os.path.dirname(__file__), 'libs/bench.py'))))
         else:
@@ -172,18 +172,19 @@ def cli(ctx, **kwargs):
 @click.option('--xmlrpc-port', envvar='SCHEDULER_XMLRPC_PORT', default=23333)
 @click.option('--inqueue-limit', default=0,
               help='size limit of task queue for each project, '
-              'tasks will been ignored when overflow')
+                   'tasks will been ignored when overflow')
 @click.option('--delete-time', default=24 * 60 * 60,
               help='delete time before marked as delete')
-@click.option('--active-tasks', default=100, help='active log size')
+@click.option('--active-tasks', default=1000, help='active log size')
+@click.option('--task-queue-cache-size', default=10000, help='size of tasks that loaded to memery from db')
 @click.option('--loop-limit', default=1000, help='maximum number of tasks due with in a loop')
 @click.option('--fail-pause-num', default=10, help='auto pause the project when last FAIL_PAUSE_NUM task failed, set 0 to disable')
 @click.option('--scheduler-cls', default='pyspider.scheduler.ThreadBaseScheduler', callback=load_cls,
               help='scheduler class to be used.')
-@click.option('--threads', default=None, help='thread number for ThreadBaseScheduler, default: 4')
+@click.option('--threads', default=4, help='thread number for ThreadBaseScheduler, default: 4')
 @click.pass_context
 def scheduler(ctx, xmlrpc, xmlrpc_host, xmlrpc_port,
-              inqueue_limit, delete_time, active_tasks, loop_limit, fail_pause_num,
+              inqueue_limit, delete_time, active_tasks, task_queue_cache_size, loop_limit, fail_pause_num,
               scheduler_cls, threads, get_object=False):
     """
     Run Scheduler, only one scheduler is allowed.
@@ -201,6 +202,7 @@ def scheduler(ctx, xmlrpc, xmlrpc_host, xmlrpc_port,
     scheduler.INQUEUE_LIMIT = inqueue_limit
     scheduler.DELETE_TIME = delete_time
     scheduler.ACTIVE_TASKS = active_tasks
+    scheduler.TASK_QUEUE_CACHE_SIZE = task_queue_cache_size
     scheduler.LOOP_LIMIT = loop_limit
     scheduler.FAIL_PAUSE_NUM = fail_pause_num
 
@@ -403,7 +405,7 @@ def phantomjs(ctx, phantomjs_path, port, auto_restart, args):
         os.path.dirname(pyspider.__file__), 'fetcher/phantomjs_fetcher.js')
     cmd = [phantomjs_path,
            # this may cause memory leak: https://github.com/ariya/phantomjs/issues/12903
-           #'--load-images=false',
+           # '--load-images=false',
            '--ssl-protocol=any',
            '--disk-cache=true'] + list(args or []) + [phantomjs_fetcher, str(port)]
 
@@ -441,7 +443,7 @@ def phantomjs(ctx, phantomjs_path, port, auto_restart, args):
               help='instance num of result worker')
 @click.option('--run-in', default='subprocess', type=click.Choice(['subprocess', 'thread']),
               help='run each components in thread or subprocess. '
-              'always using thread for windows.')
+                   'always using thread for windows.')
 @click.pass_context
 def all(ctx, fetcher_num, processor_num, result_worker_num, run_in):
     """
@@ -515,7 +517,7 @@ def all(ctx, fetcher_num, processor_num, result_worker_num, run_in):
 @click.option('--result-worker-num', default=1, help='instance num of result worker')
 @click.option('--run-in', default='subprocess', type=click.Choice(['subprocess', 'thread']),
               help='run each components in thread or subprocess. '
-              'always using thread for windows.')
+                   'always using thread for windows.')
 @click.option('--total', default=10000, help="total url in test page")
 @click.option('--show', default=20, help="show how many urls in a page")
 @click.option('--taskdb-bench', default=False, is_flag=True,
@@ -752,6 +754,7 @@ def send_message(ctx, scheduler_rpc, project, message):
 
 def main():
     cli()
+
 
 if __name__ == '__main__':
     main()
